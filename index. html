@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relief AI</title>
+    <link rel="manifest" href="manifest.json">
+    <!-- Bootstrap CDN for visually appealing UI -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <!-- Wink NLP CDNs for offline AI sentiment analysis -->
+    <script src="https://cdn.jsdelivr.net/npm/wink-nlp@2.3.0/wink-nlp.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/wink-eng-lite-web-model@2.0.0/wink-eng-lite-web-model.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.9);
+        }
+        .card-header {
+            background: linear-gradient(135deg, #89fffd 0%, #ef32d9 100%);
+            color: white;
+            font-weight: bold;
+            border-top-left-radius: 15px;
+            border-top-right-radius: 15px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #89fffd 0%, #ef32d9 100%);
+            border: none;
+        }
+        .breath-circle {
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, #89fffd, #ef32d9);
+            border-radius: 50%;
+            margin: 20px auto;
+            transition: transform 4s ease-in-out;
+        }
+        .breath-inhale { transform: scale(1.5); }
+        .breath-hold { transform: scale(1.5); }
+        .breath-exhale { transform: scale(1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center my-4" style="color: #ef32d9;">Relief AI</h1>
+        <p class="text-center lead">Your offline AI companion for psychological relief. Journal your thoughts, breathe deeply, or relax with ambient sounds.</p>
+
+        <!-- Journaling Section -->
+        <div class="card">
+            <div class="card-header">AI-Powered Journaling</div>
+            <div class="card-body">
+                <textarea id="journal" class="form-control" rows="5" placeholder="Write your thoughts here..."></textarea>
+                <button id="analyzeBtn" class="btn btn-primary mt-3">Analyze with AI</button>
+                <div id="result" class="mt-3"></div>
+            </div>
+        </div>
+
+        <!-- Breathing Exercise Section -->
+        <div class="card">
+            <div class="card-header">Breathing Exercise</div>
+            <div class="card-body text-center">
+                <div id="breathCircle" class="breath-circle"></div>
+                <p id="breathInstruction" class="lead">Press start to begin 4-7-8 breathing.</p>
+                <button id="startBreath" class="btn btn-primary">Start Breathing</button>
+            </div>
+        </div>
+
+        <!-- Ambient Sounds Section -->
+        <div class="card">
+            <div class="card-header">Ambient White Noise</div>
+            <div class="card-body text-center">
+                <p>Play soothing white noise generated in your browser.</p>
+                <button id="playNoise" class="btn btn-primary">Play</button>
+                <button id="stopNoise" class="btn btn-secondary ms-2">Stop</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Register Service Worker for Offline PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(reg => console.log('Service Worker registered!', reg))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+
+        // Initialize Wink NLP for AI Sentiment Analysis
+        const nlp = winkNLP(winkEngLiteWebModel);
+        const its = nlp.its;
+
+        // Predefined suggestions based on sentiment
+        const positiveSuggestions = [
+            "Great mindset! Keep it up with a short walk.",
+            "Positive vibes! Try smiling at yourself in the mirror.",
+            "Awesome! Share your positivity with a friend."
+        ];
+        const neutralSuggestions = [
+            "Balanced thoughts. Take a moment to stretch.",
+            "Neutral day? Read an inspiring quote.",
+            "Steady on. Hydrate and breathe deeply."
+        ];
+        const negativeSuggestions = [
+            "Tough times? Try the breathing exercise below.",
+            "Feeling down? List three things you're grateful for.",
+            "Challenges ahead? Listen to ambient sounds to relax."
+        ];
+
+        // Journal Analysis
+        document.getElementById('analyzeBtn').addEventListener('click', () => {
+            const text = document.getElementById('journal').value;
+            if (!text) return;
+            const doc = nlp.readDoc(text);
+            const sentiment = doc.out(its.sentiment);
+            let suggestion;
+            if (sentiment > 0) {
+                suggestion = positiveSuggestions[Math.floor(Math.random() * positiveSuggestions.length)];
+            } else if (sentiment < 0) {
+                suggestion = negativeSuggestions[Math.floor(Math.random() * negativeSuggestions.length)];
+            } else {
+                suggestion = neutralSuggestions[Math.floor(Math.random() * neutralSuggestions.length)];
+            }
+            document.getElementById('result').innerHTML = `<strong>Sentiment Score:</strong> ${sentiment.toFixed(2)}<br><strong>AI Suggestion:</strong> ${suggestion}`;
+        });
+
+        // Breathing Exercise
+        let breathInterval;
+        document.getElementById('startBreath').addEventListener('click', () => {
+            const circle = document.getElementById('breathCircle');
+            const instruction = document.getElementById('breathInstruction');
+            clearInterval(breathInterval);
+            let phase = 0;
+            breathInterval = setInterval(() => {
+                if (phase === 0) {
+                    instruction.textContent = 'Inhale (4s)';
+                    circle.classList.add('breath-inhale');
+                    circle.classList.remove('breath-exhale', 'breath-hold');
+                } else if (phase === 4) {
+                    instruction.textContent = 'Hold (7s)';
+                    circle.classList.add('breath-hold');
+                } else if (phase === 11) {
+                    instruction.textContent = 'Exhale (8s)';
+                    circle.classList.add('breath-exhale');
+                    circle.classList.remove('breath-inhale', 'breath-hold');
+                } else if (phase === 19) {
+                    phase = -1;
+                }
+                phase++;
+            }, 1000);
+        });
+
+        // White Noise Generation
+        let audioContext, whiteNoise;
+        document.getElementById('playNoise').addEventListener('click', () => {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const bufferSize = 2 * audioContext.sampleRate;
+            const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            whiteNoise = audioContext.createBufferSource();
+            whiteNoise.buffer = noiseBuffer;
+            whiteNoise.loop = true;
+            whiteNoise.connect(audioContext.destination);
+            whiteNoise.start(0);
+        });
+        document.getElementById('stopNoise').addEventListener('click', () => {
+            if (whiteNoise) whiteNoise.stop();
+            if (audioContext) audioContext.close();
+        });
+    </script>
+</body>
+</html>
