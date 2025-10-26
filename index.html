@@ -7,9 +7,8 @@
     <link rel="manifest" href="manifest.json">
     <!-- Bootstrap CDN for visually appealing UI -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    <!-- Wink NLP CDNs for offline AI sentiment analysis -->
-    <script src="https://cdn.jsdelivr.net/npm/wink-nlp@2.3.0/wink-nlp.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/wink-eng-lite-web-model@2.0.0/wink-eng-lite-web-model.js"></script>
+    <!-- Compromise NLP CDN for improved offline AI sentiment analysis and entity extraction -->
+    <script src="https://unpkg.com/compromise@latest"></script>
     <style>
         body {
             background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
@@ -78,13 +77,16 @@
             top: 20px;
             right: 20px;
         }
+        #speakToggle {
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
     <button id="themeToggle" class="btn btn-secondary">Dark Mode</button>
     <div class="container">
-        <h1 class="text-center my-4" style="color: #ef32d9;">Relief AI</h1>
-        <p class="text-center lead">Your offline AI companion for psychological relief. Journal your thoughts, breathe deeply, or relax with ambient sounds. Now with saved journals and enhanced AI analysis.</p>
+        <h1 class="text-center my-4 title-color">Relief AI</h1>
+        <p class="text-center lead">Your offline AI companion for psychological relief. Journal your thoughts, breathe deeply, relax with ambient sounds, or use the meditation timer. Enhanced with better AI and voice guidance.</p>
 
         <!-- Journaling Section -->
         <div class="card">
@@ -109,6 +111,10 @@
                 <p id="breathInstruction" class="lead">Press start to begin 4-7-8 breathing.</p>
                 <button id="startBreath" class="btn btn-primary">Start Breathing</button>
                 <button id="stopBreath" class="btn btn-secondary ms-2">Stop</button>
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" id="speakToggle" checked>
+                    <label class="form-check-label" for="speakToggle">Enable Voice Guidance</label>
+                </div>
             </div>
         </div>
 
@@ -120,9 +126,22 @@
                 <select id="soundType" class="form-select mb-3">
                     <option value="white">White Noise</option>
                     <option value="pink">Pink Noise</option>
+                    <option value="brown">Brown Noise</option>
                 </select>
                 <button id="playNoise" class="btn btn-primary">Play</button>
                 <button id="stopNoise" class="btn btn-secondary ms-2">Stop</button>
+            </div>
+        </div>
+
+        <!-- Meditation Timer Section -->
+        <div class="card">
+            <div class="card-header">Meditation Timer</div>
+            <div class="card-body text-center">
+                <p>Set a timer for meditation (in minutes).</p>
+                <input type="number" id="timerMinutes" class="form-control mb-3" min="1" max="60" value="5">
+                <button id="startTimer" class="btn btn-primary">Start Timer</button>
+                <button id="stopTimer" class="btn btn-secondary ms-2">Stop</button>
+                <p id="timerDisplay" class="lead mt-3">00:00</p>
             </div>
         </div>
     </div>
@@ -137,16 +156,23 @@
             });
         }
 
-        // Dark Mode Toggle
+        // Dark Mode Toggle with Persistence
         const themeToggle = document.getElementById('themeToggle');
+        const title = document.querySelector('.title-color');
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+            themeToggle.textContent = 'Light Mode';
+            title.style.color = '#8e44ad';
+        } else {
+            title.style.color = '#ef32d9';
+        }
         themeToggle.addEventListener('click', () => {
             document.body.classList.toggle('dark-mode');
-            themeToggle.textContent = document.body.classList.contains('dark-mode') ? 'Light Mode' : 'Dark Mode';
+            const isDark = document.body.classList.contains('dark-mode');
+            themeToggle.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+            title.style.color = isDark ? '#8e44ad' : '#ef32d9';
+            localStorage.setItem('darkMode', isDark);
         });
-
-        // Initialize Wink NLP for AI Sentiment Analysis
-        const nlp = winkNLP(winkEngLiteWebModel);
-        const its = nlp.its;
 
         // Predefined suggestions based on sentiment
         const positiveSuggestions = [
@@ -165,23 +191,28 @@
             "Challenges ahead? Listen to ambient sounds to relax."
         ];
 
-        // Journal Analysis with Enhanced Features
+        // Journal Analysis with Compromise NLP
         document.getElementById('analyzeBtn').addEventListener('click', () => {
             const text = document.getElementById('journal').value;
             if (!text) return;
-            const doc = nlp.readDoc(text);
-            const sentiment = doc.out(its.sentiment);
-            const entities = doc.entities().out(its.text);
+            const doc = nlp(text);
+            const sentiment = doc.sentiment();
+            const people = doc.people().out('array');
+            const places = doc.places().out('array');
+            const orgs = doc.organizations().out('array');
+            const topics = doc.topics().out('array');
+            const entities = [...new Set([...people, ...places, ...orgs])]; // Unique entities
             let suggestion;
-            if (sentiment > 0) {
+            if (sentiment > 0.3) {
                 suggestion = positiveSuggestions[Math.floor(Math.random() * positiveSuggestions.length)];
-            } else if (sentiment < 0) {
+            } else if (sentiment < -0.3) {
                 suggestion = negativeSuggestions[Math.floor(Math.random() * negativeSuggestions.length)];
             } else {
                 suggestion = neutralSuggestions[Math.floor(Math.random() * neutralSuggestions.length)];
             }
             let entityList = entities.length ? `<br><strong>Key Entities:</strong> ${entities.join(', ')}` : '';
-            document.getElementById('result').innerHTML = `<strong>Sentiment Score:</strong> ${sentiment.toFixed(2)}<br><strong>AI Suggestion:</strong> ${suggestion}${entityList}`;
+            let topicList = topics.length ? `<br><strong>Topics:</strong> ${topics.join(', ')}` : '';
+            document.getElementById('result').innerHTML = `<strong>Sentiment Score:</strong> ${sentiment.toFixed(2)}<br><strong>AI Suggestion:</strong> ${suggestion}${entityList}${topicList}`;
         });
 
         // Save Journal to Local Storage
@@ -218,23 +249,35 @@
         }
         loadJournals();
 
-        // Breathing Exercise
-        let breathInterval;
+        // Breathing Exercise with Voice Guidance
+        let breathInterval, lastInstruction = '';
+        const speakToggle = document.getElementById('speakToggle');
+        function speak(text) {
+            if (speakToggle.checked && 'speechSynthesis' in window && text !== lastInstruction) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                speechSynthesis.speak(utterance);
+                lastInstruction = text;
+            }
+        }
         document.getElementById('startBreath').addEventListener('click', () => {
             const circle = document.getElementById('breathCircle');
             const instruction = document.getElementById('breathInstruction');
             clearInterval(breathInterval);
+            lastInstruction = '';
             let phase = 0;
             breathInterval = setInterval(() => {
                 if (phase === 0) {
                     instruction.textContent = 'Inhale (4s)';
+                    speak('Inhale');
                     circle.classList.add('breath-inhale');
                     circle.classList.remove('breath-exhale', 'breath-hold');
                 } else if (phase === 4) {
                     instruction.textContent = 'Hold (7s)';
+                    speak('Hold');
                     circle.classList.add('breath-hold');
                 } else if (phase === 11) {
                     instruction.textContent = 'Exhale (8s)';
+                    speak('Exhale');
                     circle.classList.add('breath-exhale');
                     circle.classList.remove('breath-inhale', 'breath-hold');
                 } else if (phase === 19) {
@@ -248,6 +291,7 @@
             document.getElementById('breathInstruction').textContent = 'Breathing stopped. Press start to begin again.';
             const circle = document.getElementById('breathCircle');
             circle.classList.remove('breath-inhale', 'breath-hold', 'breath-exhale');
+            speechSynthesis.cancel();
         });
 
         // Ambient Sounds Generation
@@ -274,6 +318,14 @@
                     output[i] *= 0.11;
                     b6 = white * 0.115926;
                 }
+            } else if (type === 'brown') {
+                let lastOut = 0.0;
+                for (let i = 0; i < bufferSize; i++) {
+                    const white = Math.random() * 2 - 1;
+                    output[i] = (lastOut + (0.02 * white)) / 1.02;
+                    lastOut = output[i];
+                    output[i] *= 3.5; // Adjust volume
+                }
             }
             noiseSource = audioContext.createBufferSource();
             noiseSource.buffer = noiseBuffer;
@@ -291,6 +343,37 @@
         document.getElementById('stopNoise').addEventListener('click', () => {
             if (noiseSource) noiseSource.stop();
             if (audioContext) audioContext.close();
+        });
+
+        // Meditation Timer
+        let timerInterval;
+        document.getElementById('startTimer').addEventListener('click', () => {
+            const minutes = parseInt(document.getElementById('timerMinutes').value) || 5;
+            let timeLeft = minutes * 60;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                const mins = Math.floor(timeLeft / 60);
+                const secs = timeLeft % 60;
+                document.getElementById('timerDisplay').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    document.getElementById('timerDisplay').textContent = '00:00';
+                    speak('Meditation complete');
+                    // Play a simple tone as bell
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(440, ctx.currentTime);
+                    osc.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.5);
+                }
+            }, 1000);
+        });
+        document.getElementById('stopTimer').addEventListener('click', () => {
+            clearInterval(timerInterval);
+            document.getElementById('timerDisplay').textContent = '00:00';
         });
     </script>
 </body>
